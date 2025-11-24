@@ -370,7 +370,7 @@ async def author(ctx):
         embed.set_thumbnail(url=avatar)
     except Exception:
         pass
-    embed.add_field(name="Links", value="[GitHub](https://github.com/vaishnavdounde65) | [YouTube](https://youtube.com/@vaishnavdounde) | [Instagram](https://instagram.com/vaishnavdounde65)", inline=False)
+    embed.add_field(name="Links", value="[GitHub](https://github.com/vaishnavxd) | [YouTube](https://youtube.com/@vaishnavtf) | [Instagram](https://instagram.com/vaishnavdxd)", inline=False)
     embed.set_footer(text="GameClaim • Free Game Tracker")
     await ctx.reply(embed=embed)
 
@@ -602,3 +602,4 @@ def format_duration(delta):
 # Start loops & bot
 # -----------------------
 bot.run(TOKEN)
+
