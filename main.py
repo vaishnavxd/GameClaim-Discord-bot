@@ -1,4 +1,4 @@
-# bot.py
+
 import os
 import traceback
 import requests
@@ -412,7 +412,7 @@ async def slash_help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # -----------------------
-# free (epic + steam) commands (copied behaviour)
+# free (epic + steam) command
 # -----------------------
 @bot.command()
 async def free(ctx, platform=None):
@@ -578,7 +578,7 @@ async def steam_games():
 
         await send_to_all_guilds(embed, "steam", game_id, title=game.get("title"), url=game.get("open_giveaway_url", ""))
 
-# # Optional: periodic DB cleanup every day
+# periodic DB cleanup every day
 # @tasks.loop(hours=24)
 # async def daily_cleanup():
 #     cleanup_sent_games_db()
@@ -602,5 +602,6 @@ def format_duration(delta):
 # Start loops & bot
 # -----------------------
 bot.run(TOKEN)
+
 
 
