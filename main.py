@@ -333,28 +333,6 @@ async def removechannel(ctx):
 async def ping(ctx):
     await ctx.reply(f"🏓 Pong! Bot latency: {round(bot.latency * 1000)}ms")
 
-@bot.command(name="promote")
-@commands.is_owner()
-async def promote(ctx):
-    embed = discord.Embed(
-        title="**Vote for GameClaim Bot!**",
-        description="If you enjoy using GameClaim, please consider voting for us on Top.gg! Your support helps us grow and improve the bot.",
-        color=discord.Color.gold()
-    )
-    embed.set_thumbnail(url=bot.user.display_avatar.url)
-    embed.add_field(name="Why Vote?", value="Voting helps us reach more users and continue providing free game alerts. It only takes a moment!", inline=False)
-    embed.add_field(name="Vote Link", value="[Click here to vote](https://top.gg/bot/1390705635754119291/vote)", inline=False)
-    embed.set_footer(text="Thank you for your support! 🎮")
-
-    settings = get_all_guild_settings()
-    for row in settings:
-        try:
-            ch = bot.get_channel(int(row.get("channel_id")))
-            if ch:
-                await ch.send(embed=embed)
-        except Exception as e:
-            print("❌ promote send error:", e)
-    await ctx.reply("✅ Promotional message sent to all alert channels.")
 
 @bot.command()
 async def author(ctx):
@@ -597,6 +575,39 @@ def format_duration(delta):
     if minutes > 0 and delta.days == 0:
         parts.append(f"{minutes} min{'s' if minutes != 1 else ''}")
     return " ".join(parts) if parts else "Ends soon!"
+
+# Owner Only Section
+
+@bot.command(name="guildsin")
+@commands.is_owner()
+async def guilds_in(ctx):
+    print("📋 Connected guilds:")
+    for guild in bot.guilds:
+        print(f" - {guild.name} (ID: {guild.id})")
+
+@bot.command(name="promote")
+@commands.is_owner()
+async def promote(ctx):
+    embed = discord.Embed(
+        title="**Vote for GameClaim Bot!**",
+        description="If you enjoy using GameClaim, please consider voting for us on Top.gg! Your support helps us grow and improve the bot.",
+        color=discord.Color.gold()
+    )
+    embed.set_thumbnail(url=bot.user.display_avatar.url)
+    embed.add_field(name="Why Vote?", value="Voting helps us reach more users and continue providing free game alerts. It only takes a moment!", inline=False)
+    embed.add_field(name="Vote Link", value="[Click here to vote](https://top.gg/bot/1390705635754119291/vote)", inline=False)
+    embed.set_footer(text="Thank you for your support! 🎮")
+
+    settings = get_all_guild_settings()
+    for row in settings:
+        try:
+            ch = bot.get_channel(int(row.get("channel_id")))
+            if ch:
+                await ch.send(embed=embed)
+        except Exception as e:
+            print("❌ promote send error:", e)
+    await ctx.reply("✅ Promotional message sent to all alert channels.")
+
 
 # -----------------------
 # Start loops & bot
