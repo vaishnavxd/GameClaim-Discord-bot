@@ -581,9 +581,9 @@ def format_duration(delta):
 @bot.command(name="guildsin")
 @commands.is_owner()
 async def guilds_in(ctx):
-    print("📋 Connected guilds:")
+    await ctx.reply("📋 Connected guilds:")
     for guild in bot.guilds:
-        print(f" - {guild.name} (ID: {guild.id})")
+        await ctx.send(f" - {guild.name} (ID: {guild.id})")
 
 @bot.command(name="promote")
 @commands.is_owner()
