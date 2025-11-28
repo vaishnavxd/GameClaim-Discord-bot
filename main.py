@@ -608,6 +608,94 @@ async def promote(ctx):
             print("❌ promote send error:", e)
     await ctx.reply("✅ Promotional message sent to all alert channels.")
 
+@bot.command(name="announce_default")
+@commands.is_owner()
+async def announce_default(ctx, *, message: str = None):
+    """
+    Owner-only: send a message to each guild's default channel (system_channel or first sendable text channel).
+    If no message is provided, sends a default reminder asking servers to re-run g!setchannel and g!updateping.
+    """
+    default_message = (
+        "👋 Hi! The GameClaim bot's alert database was reset.\n\n"
+        "Please reconfigure your server so you can keep receiving free-game alerts:\n"
+        "• Set an alert channel with: `g!setchannel #channel`\n"
+        "• Set a ping role (optional) with: `g!updateping @role`\n\n"
+        "If you need help, run `g!help` or contact the bot owner."
+    )
+
+    text_to_send = message or default_message
+
+    success = 0
+    failed = 0
+    failed_guilds = []  # keep small list for debugging (guild id and reason)
+
+    for guild in bot.guilds:
+        # pick a best-effort channel to send to
+        target_channel = None
+
+        try:
+            # 1) try the system channel
+            if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
+                target_channel = guild.system_channel
+            else:
+                # 2) fallback: first text channel where bot can send
+                for ch in sorted(guild.text_channels, key=lambda c: c.position):
+                    perms = ch.permissions_for(guild.me)
+                    if perms.send_messages and perms.view_channel:
+                        target_channel = ch
+                        break
+
+            if target_channel:
+                try:
+                    # Use embed for nicer look if message is long/contains newlines
+                    if "\n" in text_to_send or len(text_to_send) > 120:
+                        embed = discord.Embed(
+                            title="📢 GameClaim: Please reconfigure alerts",
+                            description=text_to_send,
+                            color=discord.Color.gold()
+                        )
+                        embed.set_footer(text="GameClaim • run g!setchannel #channel and g!updateping @role")
+                        await target_channel.send(embed=embed)
+                    else:
+                        # short single-line message -> plain text
+                        await target_channel.send(text_to_send)
+                    success += 1
+                    continue
+                except Exception as e:
+                    print(f"❌ Send to channel {target_channel.id} (guild {guild.id}) failed: {e}")
+                    # fallthrough to attempt DM
+            # 3) if no channel or send failed, try DMing the owner
+            try:
+                owner = guild.owner
+                if owner:
+                    try:
+                        await owner.send(
+                            "Hi! I tried to remind your server about GameClaim settings but couldn't post in a channel. "
+                            "Please re-run `g!setchannel #channel` in your server to re-enable free-game alerts.\n\n"
+                            f"Message I tried to send:\n\n{ text_to_send }"
+                        )
+                        success += 1
+                        continue
+                    except Exception as e:
+                        print(f"❌ DM to owner of {guild.id} failed: {e}")
+            except Exception as e:
+                print(f"❌ Could not fetch owner for guild {guild.id}: {e}")
+
+            # If we reach here, it's a failure for this guild
+            failed += 1
+            failed_guilds.append((guild.id, guild.name))
+        except Exception as e:
+            print(f"❌ announce_default error for guild {guild.id}: {e}")
+            traceback.print_exc()
+            failed += 1
+            failed_guilds.append((guild.id, guild.name))
+
+    # Report back to the command invoker
+    await ctx.reply(f"✅ Announcement attempts complete: {success} succeeded, {failed} failed.")
+    if failed_guilds:
+        # print to console for debugging; avoid spamming Discord if many
+        print("Failed guilds (id, name):", failed_guilds)
+
 
 # -----------------------
 # Start loops & bot
