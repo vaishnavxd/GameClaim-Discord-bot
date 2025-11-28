@@ -696,6 +696,19 @@ async def announce_default(ctx, *, message: str = None):
         # print to console for debugging; avoid spamming Discord if many
         print("Failed guilds (id, name):", failed_guilds)
 
+@bot.command(name="ownerhelp")
+@commands.is_owner()
+async def owner_help(ctx):
+    embed = discord.Embed(
+        title="**GameClaim Bot Owner Commands**",
+        description="These commands are restricted to the bot owner.",
+        color=discord.Color.dark_gold()
+    )
+    embed.add_field(name="`g!guildsin`", value="List all guilds the bot is connected to.", inline=False)
+    embed.add_field(name="`g!promote`", value="Send a promotional message to all guilds' alert channels.", inline=False)
+    embed.add_field(name="`g!announce_default [message]`", value="Send a default or custom message to each guild's default channel or DM the owner.", inline=False)
+    embed.set_footer(text="GameClaim • Bot Owner Commands")
+    await ctx.reply(embed=embed)
 
 # -----------------------
 # Start loops & bot
