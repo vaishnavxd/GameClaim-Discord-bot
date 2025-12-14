@@ -74,8 +74,6 @@ This project is licensed under the MIT License.
 
 ## 👤 Author
 
-Argue / Vaishnav Dounde
-
 🔗 GitHub: https://github.com/vaishnavxd
 
 📸 Instagram: https://instagram.com/vaishnavxd
