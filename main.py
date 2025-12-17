@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 import traceback
 import asyncio
 
+from keepAlive import keep_alive
+keep_alive()
+
 load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -63,3 +66,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
