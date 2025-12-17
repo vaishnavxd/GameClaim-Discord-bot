@@ -1,5 +1,5 @@
 # 🎮 GameClaim — Free Game Alert Discord Bot  
-**Epic Games + Steam free games delivered directly to your Discord server.**
+**Epic Games + Steam free games delivered directly to your Discord server**
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12-blue?logo=python&logoColor=white" />
@@ -19,37 +19,51 @@
 ## ✨ Features
 
 - 🔔 **Instant notifications** for free PC games  
-- 🎯 Supports **Epic Games Store** + **Steam giveaways**  
+- 🎯 Supports **Epic Games Store** and **Steam giveaways**  
 - 📡 Per-server **custom alert channels**  
 - 🎭 Optional **ping roles**  
 - 🛡️ Prevents **duplicate announcements** using Supabase  
 - 🧹 Auto-cleans old entries after **15 days**  
 - 🌐 Slash command support  
-- ⚡ Minimal, fast, async, and reliable bot
+- ⚡ Minimal, fast, async, and reliable bot  
+
+---
+
+## 🚀 Invite My Bot
+
+Want to use **GameClaim** in your own Discord server?
+
+👉 **[Invite GameClaim to your server](https://discord.com/oauth2/authorize?client_id=1390705635754119291&permissions=2147731520&integration_type=0&scope=bot)**
 
 
 ---
 
 ## 🛠️ Installation
 
-### **1. Clone the repository**
+### 1️⃣ Clone the repository
 ```bash
 git clone https://github.com/<your-username>/GameClaim.git
 cd GameClaim
 ```
 
-### **2. Install dependencies**
+### 2️⃣ Install dependencies
+```bash
 pip install -r requirements.txt
+```
 
-### **3. Create a .env file**
+### 3️⃣ Create a .env file
+```bash
 DISCORD_TOKEN=your_discord_bot_token
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_KEY=your_supabase_service_role_key
+```
 
-### **4. Start the bot**
+### 4️⃣ Start the bot
+```bash
 python main.py
+```
 
-## 📚 Tech Stack
+### 📚 Tech Stack
 
 Python 3
 
@@ -63,16 +77,17 @@ Epic Games API
 
 Async tasks / background loops
 
-## 🤝 Contributing
 
-Pull requests are welcome!
-Found a bug or want a feature? Open an issue.
+### 🤝 Contributing
 
-## 📄 License
+Pull requests are welcome.
+Found a bug or want a feature? Feel free to open an issue.
+
+📄 License
 
 This project is licensed under the MIT License.
 
-## 👤 Author
+👤 Author
 
 🔗 GitHub: https://github.com/vaishnavxd
 
@@ -80,7 +95,7 @@ This project is licensed under the MIT License.
 
 ▶️ YouTube: https://youtube.com/@vaishnavtf
 
-## ⭐ Support the Project
+### ⭐ Support the Project
 
-If you like this project, consider starring the repo ⭐
-It helps more people discover GameClaim!
+If you like this project, consider giving it a ⭐
+It helps more people discover GameClaim.
