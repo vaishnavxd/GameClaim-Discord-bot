@@ -9,9 +9,14 @@ class Owner(commands.Cog):
     @commands.command(name="guildsin")
     @commands.is_owner()
     async def guilds_in(self, ctx):
-        await ctx.reply("📋 Connected guilds:")
-        for guild in self.bot.guilds:
-            await ctx.send(f" - {guild.name} (ID: {guild.id})")
+        guild_count = len(self.bot.guilds)
+        embed = discord.Embed(
+            title="🌐 Server Statistics",
+            description=f"GameClaim is currently serving **{guild_count}** Discord servers!",
+            color=ctx.author.color
+        )
+        embed.set_footer(text="Thank you for using GameClaim! 🎮")
+        await ctx.reply(embed=embed)
 
     @commands.command(name="promote")
     @commands.is_owner()
@@ -36,76 +41,48 @@ class Owner(commands.Cog):
                 print("❌ promote send error:", e)
         await ctx.reply("✅ Promotional message sent to all alert channels.")
 
-    @commands.command(name="announce_default")
+
+    @commands.command(name="announce")
     @commands.is_owner()
-    async def announce_default(self, ctx, *, message: str = None):
+    async def announce(self, ctx, title: str, description: str, footer: str = None):
         """
-        Owner-only: send a message to each guild's default channel.
+        Send a custom announcement embed to all configured game alert channels.
+        
+        Usage:
+            g!announce "Title" "Description" "Footer"
+            g!announce "Update Available" "GameClaim v2.0 is now live!" "Thanks for using GameClaim"
         """
-        default_message = (
-            "👋 Hi! The GameClaim bot's alert database was reset.\n\n"
-            "Please reconfigure your server so you can keep receiving free-game alerts:\n"
-            "• Set an alert channel with: `g!setchannel #channel`\n"
-            "• Set a ping role (optional) with: `g!updateping @role`\n\n"
-            "If you need help, run `g!help` or contact the bot owner."
-        )
-        text_to_send = message or default_message
         success = 0
         failed = 0
-        failed_guilds = []
-
-        for guild in self.bot.guilds:
-            target_channel = None
+        
+        # Create embed
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=ctx.author.color
+        )
+        
+        if footer:
+            embed.set_footer(text=footer)
+        else:
+            embed.set_footer(text="GameClaim • Free Game Alerts")
+        
+        # Get all guild settings and send to their alert channels
+        settings = get_all_guild_settings()
+        for row in settings:
             try:
-                if guild.system_channel and guild.system_channel.permissions_for(guild.me).send_messages:
-                    target_channel = guild.system_channel
+                ch = self.bot.get_channel(int(row.get("channel_id")))
+                if ch:
+                    await ch.send(embed=embed)
+                    success += 1
                 else:
-                    for ch in sorted(guild.text_channels, key=lambda c: c.position):
-                        perms = ch.permissions_for(guild.me)
-                        if perms.send_messages and perms.view_channel:
-                            target_channel = ch
-                            break
-                if target_channel:
-                    try:
-                        if "\n" in text_to_send or len(text_to_send) > 120:
-                            embed = discord.Embed(
-                                title="📢 GameClaim: Please reconfigure alerts",
-                                description=text_to_send,
-                                color=ctx.author.color
-                            )
-                            embed.set_footer(text="GameClaim • run g!setchannel #channel and g!updateping @role")
-                            await target_channel.send(embed=embed)
-                        else:
-                            await target_channel.send(text_to_send)
-                        success += 1
-                        continue
-                    except Exception:
-                        pass
-                
-                # Fallback to DM
-                try:
-                    owner = guild.owner
-                    if owner:
-                        await owner.send(
-                            "Hi! I tried to remind your server about GameClaim settings but couldn't post in a channel. "
-                            "Please re-run `g!setchannel #channel` in your server to re-enable free-game alerts.\n\n"
-                            f"Message I tried to send:\n\n{ text_to_send }"
-                        )
-                        success += 1
-                        continue
-                except Exception:
-                    pass
-
-                failed += 1
-                failed_guilds.append((guild.id, guild.name))
+                    failed += 1
             except Exception as e:
-                print(f"❌ announce_default error for guild {guild.id}: {e}")
+                print(f"❌ announce send error: {e}")
                 failed += 1
-                failed_guilds.append((guild.id, guild.name))
+        
+        await ctx.reply(f"✅ Announcement sent to {success} channels. Failed: {failed}")
 
-        await ctx.reply(f"✅ Announcement attempts complete: {success} succeeded, {failed} failed.")
-        if failed_guilds:
-            print("Failed guilds (id, name):", failed_guilds)
 
     @commands.command(name="ownerhelp")
     @commands.is_owner()
@@ -117,7 +94,7 @@ class Owner(commands.Cog):
         )
         embed.add_field(name="`g!guildsin`", value="List all guilds the bot is connected to.", inline=False)
         embed.add_field(name="`g!promote`", value="Send a promotional message to all guilds' alert channels.", inline=False)
-        embed.add_field(name="`g!announce_default [message]`", value="Send a default or custom message to each guild's default channel or DM the owner.", inline=False)
+        embed.add_field(name="`g!announce \"title\" \"description\" \"footer\"`", value="Send a custom embed announcement to all configured alert channels.", inline=False)
         embed.set_footer(text="GameClaim • Bot Owner Commands")
         await ctx.reply(embed=embed)
 
