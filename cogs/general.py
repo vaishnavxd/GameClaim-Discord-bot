@@ -62,17 +62,26 @@ class General(commands.Cog):
     def _build_help_embed(self, user):
         embed = discord.Embed(
             title="**GameClaim Bot Commands**",
-            description="Use `g!` or mention the bot as the prefix for all commands.",
+            description="GameClaim supports both **prefix commands** (`g!command`) and **slash commands** (`/command`).\nYou can use either method for all commands!",
             color=user.color
         )
-        embed.add_field(name="`g!setchannel #channel`", value="Set the alert channel.", inline=False)
+        embed.add_field(name="**🎮 Free Games**", value="", inline=False)
+        embed.add_field(name="`g!free epic/steam` or `/free`", value="Get current free games from Epic or Steam.", inline=False)
+        
+        embed.add_field(name="**💰 Game Prices**", value="", inline=False)
+        embed.add_field(name="`g!price <game> [currency]` or `/price`", value="Check game prices from multiple stores.\nExample: `g!price cyberpunk 2077 inr`\nSupports 30+ currencies (USD, EUR, GBP, INR, etc.)", inline=False)
+        
+        embed.add_field(name="**⚙️ Server Setup**", value="", inline=False)
+        embed.add_field(name="`g!setchannel #channel`", value="Set the alert channel for free game notifications.", inline=False)
         embed.add_field(name="`g!updateping @role`", value="Set a role to ping (or remove by not passing a role).", inline=False)
         embed.add_field(name="`g!currentchannel`", value="Show the current alert channel and ping roles.", inline=False)
         embed.add_field(name="`g!removechannel`", value="Remove the alert channel.", inline=False)
-        embed.add_field(name="`g!free epic/steam`", value="🎮 Get current free games from Epic or Steam.", inline=False)
-        embed.add_field(name="`g!ping`", value="Bot latency check.", inline=False)
-        embed.add_field(name="`g!author`", value="Bot creator info.", inline=False)
-        embed.set_footer(text="GameClaim • Free Game Tracker")
+        
+        embed.add_field(name="**ℹ️ Info & Utility**", value="", inline=False)
+        embed.add_field(name="`g!ping` or `/ping`", value="Check bot latency.", inline=False)
+        embed.add_field(name="`g!author` or `/author`", value="Show bot creator info.", inline=False)
+        
+        embed.set_footer(text="GameClaim • Free Game Tracker & Price Checker")
         return embed
 
 
