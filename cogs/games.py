@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
-import requests
+import aiohttp
 import asyncio
 from datetime import datetime, timezone, timedelta
 import traceback
@@ -18,13 +18,17 @@ class GameView(discord.ui.View):
 class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.session = aiohttp.ClientSession()
         # Start loops
         self.check_free_games.start()
         self.steam_games.start()
 
+    async def cog_unload(self):
+        if self.session:
+            await self.session.close()
+
     async def cog_load(self):
         # Initial cleanup scheduled here to be async compatible
-        # Using asyncio.create_task directly as bot.loop might not be accessible yet
         asyncio.create_task(cleanup_sent_games_db())
 
     async def send_to_all_guilds(self, embed, platform, game_key, title=None, url=None, start_iso=None):
@@ -98,17 +102,21 @@ class Games(commands.Cog):
 
         print(f"✅ Send summary: {success_count}/{total} succeeded.")
 
-
-    @tasks.loop(hours=1)
-    async def check_free_games(self):
+    async def fetch_epic_games(self):
+        """Fetches free games from Epic Games Store"""
+        games_found = []
         try:
-            res = requests.get(
-                "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US",
-                timeout=10
-            ).json()
+            url = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
+            async with self.session.get(url, timeout=10) as response:
+                if response.status != 200:
+                    return []
+                res = await response.json()
         except Exception as e:
-            print(f"❌ Failed to fetch Epic games loop: {e}")
-            return
+            print(f"❌ Failed to fetch Epic games: {e}")
+            return []
+
+        if not res or "data" not in res:
+            return []
 
         for game in res["data"]["Catalog"]["searchStore"]["elements"]:
             title = game.get("title", "Unknown")
@@ -131,7 +139,10 @@ class Games(commands.Cog):
             slug = game.get("productSlug") or game.get("catalogNs", {}).get("mappings", [{}])[0].get("pageSlug", "")
             game_key = slug or title
             link = f"https://store.epicgames.com/en-US/p/{slug}" if slug else "https://store.epicgames.com/"
-            price = game.get("price", {}).get("totalPrice", {}).get("originalPrice", 0) / 100
+            
+            price_data = game.get("price", {}).get("totalPrice", {})
+            price = price_data.get("originalPrice", 0) / 100
+            
             images = game.get("keyImages", [])
             thumb = next((img["url"] for img in images if img.get("type") == "Thumbnail"), images[0]["url"] if images else None)
 
@@ -146,19 +157,28 @@ class Games(commands.Cog):
                 embed.set_image(url=thumb)
             embed.set_footer(text="GameClaim • Epic Freebie")
 
-            await self.send_to_all_guilds(embed, "epic", game_key, title=title, url=link, start_iso=start.isoformat())
+            games_found.append({
+                "key": game_key,
+                "title": title,
+                "url": link,
+                "embed": embed,
+                "start_iso": start.isoformat()
+            })
+        
+        return games_found
 
-    @check_free_games.before_loop
-    async def before_check_free_games(self):
-        await self.bot.wait_until_ready()
-
-    @tasks.loop(hours=1)
-    async def steam_games(self):
+    async def fetch_steam_games(self):
+        """Fetches free games from GamerPower (Steam)"""
+        games_found = []
         try:
-            res = requests.get("https://www.gamerpower.com/api/giveaways?platform=steam", timeout=10).json()
+            url = "https://www.gamerpower.com/api/giveaways?platform=steam"
+            async with self.session.get(url, timeout=10) as response:
+                if response.status != 200:
+                    return []
+                res = await response.json()
         except Exception as e:
-            print(f"❌ Failed to fetch Steam games loop: {e}")
-            return
+            print(f"❌ Failed to fetch Steam games: {e}")
+            return []
 
         for game in res[:5]:
             game_id = str(game.get("id"))
@@ -172,11 +192,95 @@ class Games(commands.Cog):
             embed.set_image(url=game.get("thumbnail", ""))
             embed.set_footer(text="GameClaim • Steam Freebie")
 
-            await self.send_to_all_guilds(embed, "steam", game_id, title=game.get("title"), url=game.get("open_giveaway_url", ""))
+            games_found.append({
+                "key": game_id,
+                "title": game.get("title"),
+                "url": game.get("open_giveaway_url", ""),
+                "embed": embed,
+                "start_iso": None
+            })
+        
+        return games_found
+
+    @tasks.loop(hours=1)
+    async def check_free_games(self):
+        games = await self.fetch_epic_games()
+        for game in games:
+            await self.send_to_all_guilds(
+                game['embed'], 
+                "epic", 
+                game['key'], 
+                title=game['title'], 
+                url=game['url'], 
+                start_iso=game['start_iso']
+            )
+
+    @check_free_games.before_loop
+    async def before_check_free_games(self):
+        await self.bot.wait_until_ready()
+
+    @tasks.loop(hours=1)
+    async def steam_games(self):
+        games = await self.fetch_steam_games()
+        for game in games:
+            await self.send_to_all_guilds(
+                game['embed'], 
+                "steam", 
+                game['key'], 
+                title=game['title'], 
+                url=game['url'], 
+                start_iso=game['start_iso']
+            )
 
     @steam_games.before_loop
     async def before_steam_games(self):
         await self.bot.wait_until_ready()
+
+    @commands.command(name="free")
+    async def free_command(self, ctx, source: str = None):
+        """Manually fetch and show current free games."""
+        source = source.lower() if source else "all"
+        
+        games_to_show = []
+        async with ctx.typing():
+            if source in ["epic", "all"]:
+                games_to_show.extend(await self.fetch_epic_games())
+            if source in ["steam", "all"]:
+                games_to_show.extend(await self.fetch_steam_games())
+        
+        if not games_to_show:
+            await ctx.reply("❌ No free games found at the moment.", mention_author=False)
+            return
+            
+        vote_url = f"https://top.gg/bot/{self.bot.user.id}/vote"
+        for game in games_to_show:
+            view = GameView(game['url'], vote_url)
+            await ctx.reply(embed=game['embed'], view=view, mention_author=False)
+
+    @app_commands.command(name="free", description="Get current free games")
+    @app_commands.choices(platform=[
+        app_commands.Choice(name="Epic Games", value="epic"),
+        app_commands.Choice(name="Steam", value="steam"),
+        app_commands.Choice(name="All", value="all")
+    ])
+    async def slash_free(self, interaction: discord.Interaction, platform: app_commands.Choice[str] = None):
+        await interaction.response.defer()
+        source = platform.value if platform else "all"
+        
+        games_to_show = []
+        if source in ["epic", "all"]:
+            games_to_show.extend(await self.fetch_epic_games())
+        if source in ["steam", "all"]:
+            games_to_show.extend(await self.fetch_steam_games())
+
+        if not games_to_show:
+            await interaction.followup.send("❌ No free games found at the moment.")
+            return
+
+        vote_url = f"https://top.gg/bot/{self.bot.user.id}/vote"
+        for game in games_to_show:
+             view = GameView(game['url'], vote_url)
+             await interaction.followup.send(embed=game['embed'], view=view)
 
 async def setup(bot):
     await bot.add_cog(Games(bot))
