@@ -214,11 +214,26 @@ class General(commands.Cog):
 
     @app_commands.command(name="help", description="Show the list of commands")
     async def slash_help(self, interaction: discord.Interaction):
-        pages = self._get_help_pages(interaction.user)
-        view = HelpPaginationView(pages, interaction.user)
-        await interaction.response.send_message(embed=pages[0], view=view)
-        message = await interaction.original_response()
-        view.message = message
+        embed = self._build_help_embed(interaction.user)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    def _build_help_embed(self, user):
+        embed = discord.Embed(
+            title="**GameClaim Bot Commands**",
+            description="Use `g!` or mention the bot as the prefix for all commands.",
+            color=user.color
+        )
+        embed.add_field(name="`g!setchannel #channel`", value="Set the alert channel.", inline=False)
+        embed.add_field(name="`g!updateping @role`", value="Set a role to ping (or remove by not passing a role).", inline=False)
+        embed.add_field(name="`g!currentchannel`", value="Show the current alert channel and ping roles.", inline=False)
+        embed.add_field(name="`g!removechannel`", value="Remove the alert channel.", inline=False)
+        embed.add_field(name="`g!free epic/steam`", value="🎮 Get current free games from Epic or Steam.", inline=False)
+        embed.add_field(name="`g!ping`", value="Bot latency check.", inline=False)
+        embed.add_field(name="`g!author`", value="Bot creator info.", inline=False)
+        embed.set_footer(text="GameClaim • Free Game Tracker")
+        return embed
+
+
 
 async def setup(bot):
     await bot.add_cog(General(bot))
