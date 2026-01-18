@@ -3,6 +3,26 @@ from discord.ext import commands
 from discord import app_commands
 from utils.database import upsert_guild_setting, get_guild_setting, delete_guild_setting
 
+class ConfirmView(discord.ui.View):
+    def __init__(self, author):
+        super().__init__(timeout=60)
+        self.value = None
+        self.author = author
+
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.green)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.author:
+            return
+        self.value = True
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.red)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user != self.author:
+            return
+        self.value = False
+        self.stop()
+
 class Admin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -19,7 +39,7 @@ class Admin(commands.Cog):
 
     async def _setchannel_logic(self, guild, channel, ctx_or_interaction):
         guild_id = str(guild.id)
-        res = upsert_guild_setting(guild_id, str(channel.id), [])
+        res = await upsert_guild_setting(guild_id, str(channel.id), [])
         if res is None:
             msg = "⚠️ Failed to save channel settings. Please try again."
             if isinstance(ctx_or_interaction, discord.Interaction):
@@ -47,7 +67,7 @@ class Admin(commands.Cog):
     async def _updateping_logic(self, guild, role, ctx_or_interaction):
         guild_id = str(guild.id)
 
-        setting = get_guild_setting(guild_id)
+        setting = await get_guild_setting(guild_id)
         channel_id = setting["channel_id"] if setting else "0"
         
         if role is None:
@@ -57,7 +77,7 @@ class Admin(commands.Cog):
             ping_list = [str(role.id)]
             msg = f"✅ Ping role set to {role.mention}. This role will be mentioned for new game alerts."
         
-        upsert_guild_setting(guild_id, channel_id, ping_list)
+        await upsert_guild_setting(guild_id, channel_id, ping_list)
         if isinstance(ctx_or_interaction, discord.Interaction):
             await ctx_or_interaction.response.send_message(msg)
         else:
@@ -73,7 +93,7 @@ class Admin(commands.Cog):
 
     async def _currentchannel_logic(self, guild, ctx_or_interaction):
         gid = str(guild.id)
-        setting = get_guild_setting(gid)
+        setting = await get_guild_setting(gid)
         if setting:
             try:
                 channel = self.bot.get_channel(int(setting["channel_id"]))
@@ -105,12 +125,42 @@ class Admin(commands.Cog):
 
     async def _removechannel_logic(self, guild, ctx_or_interaction):
         gid = str(guild.id)
-        delete_guild_setting(gid)
-        msg = "✅ Alert channel removed."
+        
+        # Get author for permission check
+        author = ctx_or_interaction.user if isinstance(ctx_or_interaction, discord.Interaction) else ctx_or_interaction.author
+        
+        view = ConfirmView(author)
+        msg_content = "⚠️ Are you sure you want to stop receiving game alerts? This will remove the configuration."
+        
         if isinstance(ctx_or_interaction, discord.Interaction):
-            await ctx_or_interaction.response.send_message(msg)
+            await ctx_or_interaction.response.send_message(msg_content, view=view, ephemeral=True)
+            msg = await ctx_or_interaction.original_response()
         else:
-            await ctx_or_interaction.reply(msg)
+            msg = await ctx_or_interaction.reply(msg_content, view=view)
+
+        await view.wait()
+
+        if view.value is None:
+            # Timeout
+            if isinstance(ctx_or_interaction, discord.Interaction):
+                await ctx_or_interaction.edit_original_response(content="❌ Timed out.", view=None)
+            else:
+                await msg.edit(content="❌ Timed out.", view=None)
+        elif view.value:
+            # Confirmed
+            await delete_guild_setting(gid)
+            success_msg = "✅ Alert channel removed."
+            if isinstance(ctx_or_interaction, discord.Interaction):
+                await ctx_or_interaction.edit_original_response(content=success_msg, view=None)
+            else:
+                await msg.edit(content=success_msg, view=None)
+        else:
+            # Cancelled
+            cancel_msg = "❌ Action cancelled."
+            if isinstance(ctx_or_interaction, discord.Interaction):
+                await ctx_or_interaction.edit_original_response(content=cancel_msg, view=None)
+            else:
+                await msg.edit(content=cancel_msg, view=None)
 
 async def setup(bot):
     await bot.add_cog(Admin(bot))
