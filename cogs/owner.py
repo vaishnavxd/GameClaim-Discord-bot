@@ -183,5 +183,15 @@ class Owner(commands.Cog):
         embed.set_footer(text="Thank you for using GameClaim! 🎮")
         await ctx.reply(embed=embed)
 
+    @commands.command(name="reload")
+    @commands.is_owner()
+    async def reload_cog(self, ctx, extension: str):
+        """Reloads a specific cog."""
+        try:
+            await self.bot.reload_extension(f"cogs.{extension}")
+            await ctx.reply(f"✅ Successfully reloaded `cogs.{extension}`")
+        except Exception as e:
+            await ctx.reply(f"❌ Failed to reload `cogs.{extension}`:\n```{e}```")
+
 async def setup(bot):
     await bot.add_cog(Owner(bot))

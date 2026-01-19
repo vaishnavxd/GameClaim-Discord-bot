@@ -47,24 +47,28 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
-    # Ignore check failures for help command if any
     if isinstance(error, commands.CommandNotFound):
-        # Optional: Don't reply to random messages that look like commands
+        # User made a typo or used an invalid command - show help
+        # Check if the message starts with the prefix to avoid random replies
+        if ctx.message.content.startswith(("g!", f"<@{bot.user.id}>", f"<@!{bot.user.id}>")):
+            await ctx.invoke(bot.get_command("help"))
         return
         
     if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("❌ Missing required argument. Please check your command usage.")
+        await ctx.send(f"❌ Missing required argument. Usage: `{ctx.prefix}{ctx.command.signature}`")
     elif isinstance(error, commands.BotMissingPermissions):
         await ctx.send("❌ I don't have permission to perform that action.")
     elif isinstance(error, commands.NoPrivateMessage):
         await ctx.send("❌ This command cannot be used in DMs.")
+    elif isinstance(error, commands.CommandOnCooldown):
+        await ctx.send(f"⏳ This command is on cooldown. Try again in {error.retry_after:.1f}s.")
     else:
         # Log the full exception, but send a generic message to user
         logging.error(f"❌ Error in command {ctx.command}: {error}", exc_info=True)
         try:
             await ctx.send("❌ An unexpected error occurred. Please try again later.")
         except:
-            pass # Use pass if we can't send message (e.g. no permissions)
+            pass
 
 async def main():
     # Load cogs

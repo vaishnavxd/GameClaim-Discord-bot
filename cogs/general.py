@@ -159,7 +159,7 @@ class General(commands.Cog):
         
         embed_menu.add_field(name="**📊 Statistics**", value=f"**Servers:** {server_count}\n**Members:** {member_count}\n**Uptime:** {uptime}", inline=False)
         embed_menu.add_field(name="**📍 Navigation**", value="⬅️ : Previous Page\n➡️ : Next Page", inline=False)
-        embed_menu.set_footer(text="Page 1/5 • GameClaim")
+        embed_menu.set_footer(text="Page 1/6 • GameClaim")
 
         # --- Page 1: Free Games ---
         embed_free = discord.Embed(
@@ -169,7 +169,7 @@ class General(commands.Cog):
         )
         embed_free.add_field(name="`g!free epic` or `/free epic`", value="Get current free games from Epic Games.", inline=False)
         embed_free.add_field(name="`g!free steam` or `/free steam`", value="Get current free games from Steam.", inline=False)
-        embed_free.set_footer(text="Page 2/5 • GameClaim")
+        embed_free.set_footer(text="Page 2/6 • GameClaim")
 
         # --- Page 2: Game Prices ---
         embed_price = discord.Embed(
@@ -178,7 +178,18 @@ class General(commands.Cog):
             color=user.color
         )
         embed_price.add_field(name="`g!price <game> [currency]` or `/price`", value="Check game prices.\nExample: `g!price cyberpunk 2077 inr`\nSupports 25+ currencies (USD, EUR, GBP, INR, etc.)", inline=False)
-        embed_price.set_footer(text="Page 3/5 • GameClaim")
+        embed_price.set_footer(text="Page 3/6 • GameClaim")
+
+        # --- Page 3: Game Tracking ---
+        embed_track = discord.Embed(
+            title="**🔔 Game Tracking Commands**",
+            description="Get notified when a game goes on sale.",
+            color=user.color
+        )
+        embed_track.add_field(name="`g!track <game> -atl`", value="Notify **ONLY** when the game hits its All-Time Low price.", inline=False)
+        embed_track.add_field(name="`g!track <game> -sale`", value="Notify on **ANY** sale (default preference).", inline=False)
+        embed_track.add_field(name="`g!track`", value="View or manage your current tracked game.", inline=False)
+        embed_track.set_footer(text="Page 4/6 • GameClaim")
 
         # --- Page 3: Server Setup ---
         embed_setup = discord.Embed(
@@ -190,7 +201,7 @@ class General(commands.Cog):
         embed_setup.add_field(name="`g!updateping @role`", value="Set a role to ping on alerts (optional).", inline=False)
         embed_setup.add_field(name="`g!currentchannel`", value="Show current settings.", inline=False)
         embed_setup.add_field(name="`g!removechannel`", value="Disable alerts for this server.", inline=False)
-        embed_setup.set_footer(text="Page 4/5 • GameClaim")
+        embed_setup.set_footer(text="Page 5/6 • GameClaim")
 
         # --- Page 4: Info & Utility ---
         embed_info = discord.Embed(
@@ -201,9 +212,9 @@ class General(commands.Cog):
         embed_info.add_field(name="`g!ping` or `/ping`", value="Check bot latency.", inline=False)
         embed_info.add_field(name="`g!credit` or `/credit`", value="Show bot creator info.", inline=False)
         embed_info.add_field(name="`g!invite` or `/invite`", value="Get invite link and support server.", inline=False)
-        embed_info.set_footer(text="Page 5/5 • GameClaim")
+        embed_info.set_footer(text="Page 6/6 • GameClaim")
 
-        return [embed_menu, embed_free, embed_price, embed_setup, embed_info]
+        return [embed_menu, embed_free, embed_price, embed_track, embed_setup, embed_info]
 
     @commands.command(name="help")
     async def help_command(self, ctx):
@@ -228,8 +239,9 @@ class General(commands.Cog):
         embed.add_field(name="`g!currentchannel`", value="Show the current alert channel and ping roles.", inline=False)
         embed.add_field(name="`g!removechannel`", value="Remove the alert channel.", inline=False)
         embed.add_field(name="`g!free epic/steam`", value="🎮 Get current free games from Epic or Steam.", inline=False)
+        embed.add_field(name="`g!track <game>`", value="🔔 Track a game for price drops.", inline=False)
         embed.add_field(name="`g!ping`", value="Bot latency check.", inline=False)
-        embed.add_field(name="`g!author`", value="Bot creator info.", inline=False)
+        embed.add_field(name="`g!credit`", value="Bot creator info.", inline=False)
         embed.set_footer(text="GameClaim • Free Game Tracker")
         return embed
 

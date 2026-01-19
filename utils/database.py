@@ -37,7 +37,7 @@ async def run_db(func, *args, **kwargs):
         return None
     except Exception as e:
         # Catch connection errors (e.g., bad URL, DNS failure)
-        print(f"❌ DB connection error: {e}")
+        print(f"❌ DB error: {e}")
         return None
 
 async def upsert_guild_setting(guild_id: str, channel_id: str, ping_roles):
@@ -150,3 +150,84 @@ async def cleanup_sent_games_db(cutoff_days=15):
         print("❌ cleanup_sent_games_db error:", e)
         traceback.print_exc()
         return None
+
+# -----------------------
+# Game Tracking Functions
+# -----------------------
+
+async def add_tracked_game(user_id: str, channel_id: str, game_id: str, game_name: str, track_type: str = "sale"):
+    """Add a game to track for a user. Only one game per user allowed."""
+    payload = {
+        "user_id": str(user_id),
+        "channel_id": str(channel_id),
+        "game_name": game_name,
+        "cheapshark_game_id": game_id,
+        "track_type": track_type,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    def _op():
+        # For regular users, the cog will handle the limit. 
+        # For owners, multiple entries are allowed.
+        return supabase.table("tracked_games").insert(payload).execute()
+    
+    try:
+        res = await run_db(_op)
+        return res
+    except Exception as e:
+        print(f"❌ add_tracked_game error: {e}")
+        traceback.print_exc()
+        return None
+
+async def get_all_tracked_games():
+    """Get all tracked games from database."""
+    def _op():
+        return supabase.table("tracked_games").select("*").execute()
+    
+    try:
+        res = await run_db(_op)
+        return res.data if getattr(res, "data", None) is not None else []
+    except Exception as e:
+        print(f"❌ get_all_tracked_games error: {e}")
+        traceback.print_exc()
+        return []
+
+async def remove_tracked_game(user_id: str):
+    """Remove tracked game for a user."""
+    def _op():
+        return supabase.table("tracked_games").delete().eq("user_id", str(user_id)).execute()
+    
+    try:
+        res = await run_db(_op)
+        return res
+    except Exception as e:
+        print(f"❌ remove_tracked_game error: {e}")
+        traceback.print_exc()
+        return None
+
+async def get_user_tracked_games(user_id: str):
+    """Get all tracked games for a specific user."""
+    def _op():
+        return supabase.table("tracked_games").select("*").eq("user_id", str(user_id)).execute()
+    
+    try:
+        res = await run_db(_op)
+        return res.data if getattr(res, "data", None) is not None else []
+    except Exception as e:
+        print(f"❌ get_user_tracked_games error: {e}")
+        traceback.print_exc()
+        return []
+
+async def remove_tracked_game_by_id(track_id: int):
+    """Remove a specific tracked game by its internal ID."""
+    def _op():
+        return supabase.table("tracked_games").delete().eq("id", track_id).execute()
+    
+    try:
+        res = await run_db(_op)
+        return res
+    except Exception as e:
+        print(f"❌ remove_tracked_game_by_id error: {e}")
+        traceback.print_exc()
+        return None
+

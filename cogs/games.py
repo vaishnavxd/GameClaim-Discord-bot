@@ -19,9 +19,11 @@ class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session = aiohttp.ClientSession()
-        # Start loops
-        self.check_free_games.start()
-        self.steam_games.start()
+        # Start loops safely
+        if not self.check_free_games.is_running():
+            self.check_free_games.start()
+        if not self.steam_games.is_running():
+            self.steam_games.start()
 
     async def cog_unload(self):
         if self.session:
