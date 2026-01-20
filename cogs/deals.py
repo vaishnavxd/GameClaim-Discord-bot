@@ -334,139 +334,106 @@ class OwnerTrackManageView(discord.ui.View):
         await interaction.edit_original_response(embed=self.create_embed(), view=self)
 
 class GameSelectionView(discord.ui.View):
-    def __init__(self, cog, matches, query, user_color, currency="USD", exact_match=False):
+    def __init__(self, cog, matches, query, user_color, currency="USD", exact_match=False, action="price"):
         super().__init__(timeout=120)
         self.cog = cog
-        self.matches = matches  # List of (game_name, score, game_dict)
+        self.matches = matches
         self.query = query
         self.user_color = user_color
         self.currency = currency
-        self.exact_match = exact_match
         self.current_page = 0
         self.items_per_page = 5
-        
+        self.exact_match = exact_match
+        self.action = action # "price" or "isgood"
         self.update_buttons()
-    
+
     def update_buttons(self):
         self.clear_items()
         
         if self.exact_match:
-            # Show only the first match (100% match) with a button
             game_name, score, game_dict = self.matches[0]
-            button = discord.ui.Button(
-                label=f"{game_name[:75]}",
-                style=discord.ButtonStyle.success,
-                custom_id="select_exact"
-            )
+            button = discord.ui.Button(label=f"{game_name[:75]}", style=discord.ButtonStyle.success)
             button.callback = self.create_callback(0)
             self.add_item(button)
             
-            # Add "Search for something else" button
-            other_button = discord.ui.Button(
-                label="🔍 Search for something else",
-                style=discord.ButtonStyle.secondary,
-                custom_id="show_all"
-            )
+            other_button = discord.ui.Button(label="🔍 Search for something else", style=discord.ButtonStyle.secondary)
             other_button.callback = self.show_all_matches
             self.add_item(other_button)
             return
-        
+
         start_idx = self.current_page * self.items_per_page
         end_idx = start_idx + self.items_per_page
         current_matches = self.matches[start_idx:end_idx]
-        
-        # Add buttons for current page
+
         for i, (game_name, score, game_dict) in enumerate(current_matches):
-            button = discord.ui.Button(
-                label=f"{game_name[:75]}",
-                style=discord.ButtonStyle.primary,
-                custom_id=f"select_{start_idx + i}"
-            )
+            button = discord.ui.Button(label=f"{game_name[:75]}", style=discord.ButtonStyle.primary)
             button.callback = self.create_callback(start_idx + i)
             self.add_item(button)
-        
-        # Add pagination buttons
+
         if self.current_page > 0:
-            prev_button = discord.ui.Button(label="◀ Previous", style=discord.ButtonStyle.secondary)
-            prev_button.callback = self.previous_page
-            self.add_item(prev_button)
-        
+            prev = discord.ui.Button(label="◀ Previous", style=discord.ButtonStyle.secondary)
+            prev.callback = self.previous_page
+            self.add_item(prev)
         if end_idx < len(self.matches):
-            next_button = discord.ui.Button(label="Next ▶", style=discord.ButtonStyle.secondary)
-            next_button.callback = self.next_page
-            self.add_item(next_button)
-    
+            nxt = discord.ui.Button(label="Next ▶", style=discord.ButtonStyle.secondary)
+            nxt.callback = self.next_page
+            self.add_item(nxt)
+
     def create_callback(self, index):
         async def callback(interaction: discord.Interaction):
             await interaction.response.defer()
-            
             game_name, score, game_dict = self.matches[index]
             game_id = game_dict.get("gameID")
-            
-            # Fetch full game data
-            data, error = await self.cog.fetch_game_data_by_id(game_id)
-            if error:
-                await interaction.edit_original_response(content=error, embed=None, view=None)
-                return
-            
-            embed = await self.cog.create_price_embed(data, self.user_color, self.currency)
-            view = PriceView(self.cog, data, data.get("deals", []))
-            await interaction.edit_original_response(content=None, embed=embed, view=view)
-        
+
+            if self.action == "isgood":
+                await self.cog._isgood_logic(interaction, game_id, self.user_color)
+            else: # price
+                data, error = await self.cog.fetch_game_data_by_id(game_id)
+                if error:
+                    await interaction.edit_original_response(content=error, embed=None, view=None)
+                    return
+                
+                embed = await self.cog.create_price_embed(data, self.user_color, self.currency)
+                view = PriceView(self.cog, data, data.get("deals", []))
+                await interaction.edit_original_response(content=None, embed=embed, view=view)
         return callback
-    
+
     async def previous_page(self, interaction: discord.Interaction):
         await interaction.response.defer()
         self.current_page -= 1
         self.update_buttons()
-        
-        embed = self.create_selection_embed()
-        await interaction.edit_original_response(embed=embed, view=self)
-    
+        await interaction.edit_original_response(embed=self.create_selection_embed(), view=self)
+
     async def next_page(self, interaction: discord.Interaction):
         await interaction.response.defer()
         self.current_page += 1
         self.update_buttons()
-        
-        embed = self.create_selection_embed()
-        await interaction.edit_original_response(embed=embed, view=self)
-    
+        await interaction.edit_original_response(embed=self.create_selection_embed(), view=self)
+
     async def show_all_matches(self, interaction: discord.Interaction):
         await interaction.response.defer()
         self.exact_match = False
         self.current_page = 0
         self.update_buttons()
-        
-        embed = self.create_selection_embed()
-        await interaction.edit_original_response(embed=embed, view=self)
-    
+        await interaction.edit_original_response(embed=self.create_selection_embed(), view=self)
+
     def create_selection_embed(self):
         if self.exact_match:
-            game_name, score, game_dict = self.matches[0]
-            embed = discord.Embed(
-                title=f"✅ Found: {game_name}",
-                description="Click the button below to view prices, or search for something else.",
-                color=self.user_color
-            )
-            return embed
+            title = f"✅ Found: {self.matches[0][0]}"
+            desc = "Is this the game you want to check?" if self.action == "isgood" else "Click the button below to view prices, or search for something else."
+            return discord.Embed(title=title, description=desc, color=self.user_color)
+        
+        title = f"🔍 Multiple matches found for '{self.query}'"
+        desc = "Select a game to check if it's a good deal:" if self.action == "isgood" else "Select a game from the options below:"
+        embed = discord.Embed(title=title, description=desc, color=self.user_color)
         
         start_idx = self.current_page * self.items_per_page
         end_idx = start_idx + self.items_per_page
         current_matches = self.matches[start_idx:end_idx]
         
-        embed = discord.Embed(
-            title=f"🔍 Multiple matches found for '{self.query}'",
-            description="Select a game from the options below:",
-            color=self.user_color
-        )
-        
-        game_list = ""
-        for i, (game_name, score, game_dict) in enumerate(current_matches):
-            game_list += f"{game_name} *(Match: {score:.0f}%)*\n"
-        
+        game_list = "".join([f"{m[0]} *(Match: {m[1]:.0f}%)*\n" for m in current_matches])
         embed.add_field(name="Games", value=game_list, inline=False)
         embed.set_footer(text=f"Page {self.current_page + 1} • Showing {start_idx + 1}-{min(end_idx, len(self.matches))} of {len(self.matches)} results")
-        
         return embed
 
 class Deals(commands.Cog):
@@ -475,6 +442,12 @@ class Deals(commands.Cog):
         self.api_base = "https://www.cheapshark.com/api/1.0"
         self.exchange_api = "https://api.exchangerate-api.com/v4/latest/USD"
         self.session = aiohttp.ClientSession()
+        
+        self.stores = {
+            "1": "Steam", "2": "GamersGate", "3": "GreenManGaming", "4": "Amazon",
+            "5": "GameStop", "6": "Direct2Drive", "7": "GOG", "8": "Origin",
+            "11": "Humble Store", "13": "Uplay", "15": "Fanatical", "25": "Epic Games",
+        }
         
         # Start background checker safely
         if not self.check_tracked_games_task.is_running():
@@ -619,15 +592,10 @@ class Deals(commands.Cog):
         # Deals listing
         if deals:
             deal_text = ""
-            stores = {
-                "1": "Steam", "2": "GamersGate", "3": "GreenManGaming", "4": "Amazon",
-                "5": "GameStop", "6": "Direct2Drive", "7": "GOG", "8": "Origin",
-                "11": "Humble Store", "13": "Uplay", "15": "Fanatical", "25": "Epic Games",
-            }
             # Only top 5
             for deal in deals[:5]:
                 store_id = deal.get("storeID")
-                store_name = stores.get(store_id, f"Store {store_id}")
+                store_name = self.stores.get(store_id, f"Store {store_id}")
                 price = deal.get("price", "N/A")
                 retail_price = deal.get("retailPrice", "N/A")
                 savings = float(deal.get("savings", 0))
@@ -964,6 +932,132 @@ class Deals(commands.Cog):
                 print(f"❌ Error checking tracked game: {e}")
                 continue
     
+    @commands.command(name="isgood")
+    async def isgood_command(self, ctx, *, game_name: str = None):
+        """Check if a game is worth buying right now."""
+        if not game_name:
+            await ctx.reply("❌ Please provide a game name!")
+            return
+
+        async with ctx.typing():
+            matches, error = await self.fetch_game_data(game_name, return_matches=True)
+            if error:
+                await ctx.reply(error)
+                return
+            
+            view = GameSelectionView(self, matches, game_name, ctx.author.color, exact_match=True, action="isgood")
+            await ctx.reply(embed=view.create_selection_embed(), view=view)
+
+    @app_commands.command(name="isgood", description="Check if a game is worth buying right now")
+    async def isgood_slash(self, interaction: discord.Interaction, game_name: str):
+        await interaction.response.defer()
+        matches, error = await self.fetch_game_data(game_name, return_matches=True)
+        if error:
+            await interaction.followup.send(error)
+            return
+        
+        view = GameSelectionView(self, matches, game_name, interaction.user.color, exact_match=True, action="isgood")
+        await interaction.followup.send(embed=view.create_selection_embed(), view=view)
+
+    async def _isgood_logic(self, interaction, game_id, color):
+        data, error = await self.fetch_game_data_by_id(game_id)
+        if error:
+            await interaction.edit_original_response(content=error, embed=None, view=None)
+            return
+
+        deals = data.get("deals", [])
+        if not deals:
+            await interaction.edit_original_response(content="❌ No deals found for this game.", embed=None, view=None)
+            return
+
+        # Cheapest deal across all stores
+        best_deal = min(deals, key=lambda x: float(x.get("price", 99999)))
+        curr = float(best_deal.get("price", 0))
+        retail = float(best_deal.get("retailPrice", 0))
+        atl = float(data.get("cheapestPriceEver", {}).get("price", 0))
+        savings = float(best_deal.get("savings", 0))
+        title = data.get("info", {}).get("title")
+        store_name = self.stores.get(best_deal.get("storeID"), "Unknown Store")
+
+        # Logic
+        verdict_name = "WAIT FOR BETTER SALE"
+        verdict_emoji = "🔴"
+        explanation = "The current price is significantly higher than the all-time low. Only buy if you must play it right now."
+        color_v = discord.Color.red()
+
+        if curr <= atl:
+            verdict_name = "BUY NOW (ATL)"
+            verdict_emoji = "💎"
+            explanation = "This price matches or beats the all-time low! It's the best time to buy."
+            color_v = discord.Color.gold()
+        elif curr <= atl * 1.1 or savings >= 75:
+            verdict_name = "VERY GOOD DEAL"
+            verdict_emoji = "🟢"
+            explanation = "Extremely close to the all-time low or has a massive discount. Great value!"
+            color_v = discord.Color.green()
+        elif curr <= atl * 1.25 or savings >= 50:
+            verdict_name = "GOOD DEAL"
+            verdict_emoji = "🟡"
+            explanation = "Worth buying, but it has dropped lower before."
+            color_v = discord.Color.blue()
+
+        # Calculation
+        above_atl_text = "At its absolute lowest!"
+        if curr > atl and atl > 0:
+            diff_percent = ((curr - atl) / atl) * 100
+            above_atl_text = f"{diff_percent:.0f}% above ATL"
+
+        embed = discord.Embed(title=f"🎮 {title}", color=color_v)
+        
+        embed.add_field(name="💰 Current Price", value=f"${curr:.2f} on **{store_name}**", inline=True)
+        embed.add_field(name="🏆 All-Time Low", value=f"${atl:.2f}", inline=True)
+        embed.add_field(name="📉 Discount", value=f"{savings:.0f}% off", inline=True)
+        
+        embed.add_field(name="📊 Price Analysis", value=f"• {above_atl_text}", inline=False)
+        embed.add_field(name="✅ Verdict", value=f"{verdict_emoji} **{verdict_name}**\n{explanation}", inline=False)
+        
+        if best_deal.get("dealID"):
+            link = f"https://www.cheapshark.com/redirect?dealID={best_deal['dealID']}"
+            embed.description = f"🔗 [Click to buy on {store_name}]({link})"
+
+        embed.set_thumbnail(url=data.get("info", {}).get("thumb"))
+        embed.set_footer(text="Powered by CheapShark • All stores compared")
+        
+        await interaction.edit_original_response(embed=embed, view=None)
+
+    @commands.command(name="store", aliases=["stores"])
+    async def store_command(self, ctx):
+        """Show list of supported stores."""
+        await self._stores_logic(ctx)
+
+    @app_commands.command(name="stores", description="Show list of supported stores")
+    async def stores_slash(self, interaction: discord.Interaction):
+        await self._stores_logic(interaction)
+
+    async def _stores_logic(self, target):
+        """Logic for listing supported stores."""
+        is_interaction = isinstance(target, discord.Interaction)
+        user = target.user if is_interaction else target.author
+        
+        # Sort stores by name
+        sorted_stores = sorted(self.stores.values())
+        store_list = "\n".join([f"• {store}" for store in sorted_stores])
+
+        embed = discord.Embed(
+            title="🛒 Supported Stores",
+            description=f"We monitor and compare prices across **{len(sorted_stores)}** major stores:\n\n{store_list}",
+            color=user.color
+        )
+        embed.set_footer(text="Powered by CheapShark API")
+
+        if is_interaction:
+            if not target.response.is_done():
+                await target.response.send_message(embed=embed)
+            else:
+                await target.followup.send(embed=embed)
+        else:
+            await target.reply(embed=embed)
+
     @check_tracked_games_task.before_loop
     async def before_check_tracked_games(self):
         await self.bot.wait_until_ready()

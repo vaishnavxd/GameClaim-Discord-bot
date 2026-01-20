@@ -4,12 +4,37 @@ from discord import app_commands
 import traceback
 import asyncio
 
-class HelpPaginationView(discord.ui.View):
-    def __init__(self, pages, author, timeout=60):
-        super().__init__(timeout=timeout)
+class HelpSelect(discord.ui.Select):
+    def __init__(self, pages):
+        options = [
+            discord.SelectOption(label="Overview", description="Bot stats and general info", emoji="📊", value="overview"),
+            discord.SelectOption(label="Gaming & Deals", description="Free games, prices, and tracking", emoji="🎮", value="gaming"),
+            discord.SelectOption(label="Server Admin", description="Configure bot for your server", emoji="⚙️", value="admin"),
+            discord.SelectOption(label="Info & Support", description="Bot credits and links", emoji="ℹ️", value="info")
+        ]
+        super().__init__(placeholder="Choose a category...", min_values=1, max_values=1, options=options)
         self.pages = pages
+
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            value = self.values[0]
+            embed = self.pages.get(value)
+            if embed:
+                await interaction.response.edit_message(embed=embed)
+            else:
+                await interaction.response.send_message(f"❌ Error: Page '{value}' not found.", ephemeral=True)
+        except Exception as e:
+            print(f"[Help Error] Selection callback failed: {e}")
+            traceback.print_exc()
+            if not interaction.response.is_done():
+                await interaction.response.send_message("❌ An error occurred while updating the menu.", ephemeral=True)
+
+class HelpDropdownView(discord.ui.View):
+    def __init__(self, pages, author, timeout=120):
+        super().__init__(timeout=timeout)
         self.author = author
-        self.current_page = 0
+        self.pages = pages
+        self.add_item(HelpSelect(pages))
         self.message = None
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -18,33 +43,14 @@ class HelpPaginationView(discord.ui.View):
             return False
         return True
 
-    async def update_message(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
-
-    @discord.ui.button(emoji="⬅️", style=discord.ButtonStyle.secondary)
-    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_page -= 1
-        if self.current_page < 0:
-            self.current_page = len(self.pages) - 1
-        await self.update_message(interaction)
-
-    @discord.ui.button(emoji="➡️", style=discord.ButtonStyle.secondary)
-    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_page += 1
-        if self.current_page >= len(self.pages):
-            self.current_page = 0
-        await self.update_message(interaction)
-
-
-
     async def on_timeout(self):
         if self.message:
             try:
-                # Disable buttons on timeout
                 for item in self.children:
                     item.disabled = True
                 await self.message.edit(view=self)
-            except:
+            except Exception:
+                # Silently fail on timeout if message is ephemeral or inaccessible
                 pass
 
 class CreditView(discord.ui.View):
@@ -137,113 +143,89 @@ class General(commands.Cog):
     # Help (Prefix + Slash)
     # -----------------------
     def _get_help_pages(self, user):
-        """Returns a list of Embeds for the help command."""
-        
-        # --- Page 0: Main Menu ---
-        embed_menu = discord.Embed(
-            title="**GameClaim Bot - Main Menu**",
-            description="Welcome to GameClaim Help! 🎮 \nUse the buttons below to navigate through the pages.",
-            color=user.color
-        )
+        """Returns a dictionary of Embeds for the help command."""
         from datetime import datetime, timezone
         from utils.helpers import format_duration
         
-        # Statistics
+        # --- Overview ---
+        embed_overview = discord.Embed(
+            title="**GameClaim Bot - Overview**",
+            description="🤖 Track & alert free games on Steam and Epic Games 🎮\n🚀 Never miss a deal with real-time notifications for your favorite stores!",
+            color=user.color
+        )
+        
         server_count = len(self.bot.guilds)
-        member_count = sum(g.member_count for g in self.bot.guilds)
+        member_count = sum(g.member_count or 0 for g in self.bot.guilds)
         
         uptime = "Unknown"
         if hasattr(self.bot, "launch_time"):
             diff = datetime.now(timezone.utc) - self.bot.launch_time
             uptime = format_duration(diff, fallback="Just started")
         
-        embed_menu.add_field(name="**📊 Statistics**", value=f"**Servers:** {server_count}\n**Members:** {member_count}\n**Uptime:** {uptime}", inline=False)
-        embed_menu.add_field(name="**📍 Navigation**", value="⬅️ : Previous Page\n➡️ : Next Page", inline=False)
-        embed_menu.set_footer(text="Page 1/6 • GameClaim")
+        embed_overview.add_field(name="**📊 Statistics**", value=f">>> **Servers:** {server_count}\n  **Members:** {member_count}\n  **Uptime:** {uptime}", inline=False)
+        embed_overview.add_field(name="**🔗 Quick Links**", value="> [Invite Bot](https://discord.com/oauth2/authorize?client_id=1390705635754119291&permissions=2147731520&integration_type=0&scope=bot) • [Support Server](https://discord.com/invite/kBN5jrD7QW)", inline=False)
+        embed_overview.add_field(name="**📍 How to use**", value="Select a category from the dropdown to see specific commands.", inline=False)
+        embed_overview.set_footer(text="Category: Overview • GameClaim")
 
-        # --- Page 1: Free Games ---
-        embed_free = discord.Embed(
-            title="**🎮 Free Games Commands**",
-            description="Commands to find free games.",
+        # --- Gaming & Deals ---
+        embed_gaming = discord.Embed(
+            title="**🎮 Gaming & Deals Commands**",
+            description="Find free games, track prices, and more.",
             color=user.color
         )
-        embed_free.add_field(name="`g!free epic` or `/free epic`", value="Get current free games from Epic Games.", inline=False)
-        embed_free.add_field(name="`g!free steam` or `/free steam`", value="Get current free games from Steam.", inline=False)
-        embed_free.set_footer(text="Page 2/6 • GameClaim")
+        embed_gaming.add_field(name="`g!free <source>` or `/free`", value="Get current free games from Epic or Steam.", inline=False)
+        embed_gaming.add_field(name="`g!price <game> [currency]` or `/price`", value="Check game prices across multiple stores. Supports 25+ currencies.", inline=False)
+        embed_gaming.add_field(name="`g!isgood <game>` or `/isgood`", value="Check if a game is worth buying based on its price history.", inline=False)
+        embed_gaming.add_field(name="`g!store` or `/stores`", value="Show all supported stores for price comparison.", inline=False)
+        embed_gaming.add_field(name="`g!track <game> [-atl|-sale]`", value="Get notified when a game goes on sale. Use `-atl` for All-Time Low alerts.", inline=False)
+        embed_gaming.add_field(name="`g!track` (no arguments)", value="View or manage your current tracked game.", inline=False)
+        embed_gaming.set_footer(text="Category: Gaming & Deals • GameClaim")
 
-        # --- Page 2: Game Prices ---
-        embed_price = discord.Embed(
-            title="**💰 Game Price Commands**",
-            description="Check game prices across multiple stores.",
-            color=user.color
-        )
-        embed_price.add_field(name="`g!price <game> [currency]` or `/price`", value="Check game prices.\nExample: `g!price cyberpunk 2077 inr`\nSupports 25+ currencies (USD, EUR, GBP, INR, etc.)", inline=False)
-        embed_price.set_footer(text="Page 3/6 • GameClaim")
-
-        # --- Page 3: Game Tracking ---
-        embed_track = discord.Embed(
-            title="**🔔 Game Tracking Commands**",
-            description="Get notified when a game goes on sale.",
-            color=user.color
-        )
-        embed_track.add_field(name="`g!track <game> -atl`", value="Notify **ONLY** when the game hits its All-Time Low price.", inline=False)
-        embed_track.add_field(name="`g!track <game> -sale`", value="Notify on **ANY** sale (default preference).", inline=False)
-        embed_track.add_field(name="`g!track`", value="View or manage your current tracked game.", inline=False)
-        embed_track.set_footer(text="Page 4/6 • GameClaim")
-
-        # --- Page 3: Server Setup ---
-        embed_setup = discord.Embed(
+        # --- Server Admin ---
+        embed_admin = discord.Embed(
             title="**⚙️ Server Setup Commands**",
-            description="Configure the bot for your server.",
+            description="Configure the bot for your server (Admin only).",
             color=user.color
         )
-        embed_setup.add_field(name="`g!setchannel #channel`", value="Set the alert channel for free game notifications.", inline=False)
-        embed_setup.add_field(name="`g!updateping @role`", value="Set a role to ping on alerts (optional).", inline=False)
-        embed_setup.add_field(name="`g!currentchannel`", value="Show current settings.", inline=False)
-        embed_setup.add_field(name="`g!removechannel`", value="Disable alerts for this server.", inline=False)
-        embed_setup.set_footer(text="Page 5/6 • GameClaim")
+        embed_admin.add_field(name="`g!setchannel #channel`", value="Set the alert channel for free game notifications.", inline=False)
+        embed_admin.add_field(name="`g!updateping @role`", value="Set a role to ping on alerts.", inline=False)
+        embed_admin.add_field(name="`g!currentchannel`", value="Show current alert settings.", inline=False)
+        embed_admin.add_field(name="`g!removechannel`", value="Disable alerts for this server.", inline=False)
+        embed_admin.set_footer(text="Category: Server Admin • GameClaim")
 
-        # --- Page 4: Info & Utility ---
+        # --- Info & Support ---
         embed_info = discord.Embed(
-            title="**ℹ️ Info & Utility Commands**",
-            description="General bot information.",
+            title="**ℹ️ Info & Support**",
+            description="General bot information and helpful links.",
             color=user.color
         )
         embed_info.add_field(name="`g!ping` or `/ping`", value="Check bot latency.", inline=False)
         embed_info.add_field(name="`g!credit` or `/credit`", value="Show bot creator info.", inline=False)
         embed_info.add_field(name="`g!invite` or `/invite`", value="Get invite link and support server.", inline=False)
-        embed_info.set_footer(text="Page 6/6 • GameClaim")
+        embed_info.add_field(name="Support Server", value="[Join Here](https://discord.com/invite/kBN5jrD7QW)", inline=False)
+        embed_info.add_field(name="Invite Link", value="[Click to Invite](https://discord.com/oauth2/authorize?client_id=1390705635754119291&permissions=2147731520&integration_type=0&scope=bot)", inline=False)
+        embed_info.set_footer(text="Category: Info & Support • GameClaim")
 
-        return [embed_menu, embed_free, embed_price, embed_track, embed_setup, embed_info]
+        return {
+            "overview": embed_overview,
+            "gaming": embed_gaming,
+            "admin": embed_admin,
+            "info": embed_info
+        }
 
     @commands.command(name="help")
     async def help_command(self, ctx):
         pages = self._get_help_pages(ctx.author)
-        view = HelpPaginationView(pages, ctx.author)
-        message = await ctx.reply(embed=pages[0], view=view)
+        view = HelpDropdownView(pages, ctx.author)
+        message = await ctx.reply(embed=pages["overview"], view=view)
         view.message = message
 
     @app_commands.command(name="help", description="Show the list of commands")
     async def slash_help(self, interaction: discord.Interaction):
-        embed = self._build_help_embed(interaction.user)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    def _build_help_embed(self, user):
-        embed = discord.Embed(
-            title="**GameClaim Bot Commands**",
-            description="Use `g!` or mention the bot as the prefix for all commands.",
-            color=user.color
-        )
-        embed.add_field(name="`g!setchannel #channel`", value="Set the alert channel.", inline=False)
-        embed.add_field(name="`g!updateping @role`", value="Set a role to ping (or remove by not passing a role).", inline=False)
-        embed.add_field(name="`g!currentchannel`", value="Show the current alert channel and ping roles.", inline=False)
-        embed.add_field(name="`g!removechannel`", value="Remove the alert channel.", inline=False)
-        embed.add_field(name="`g!free epic/steam`", value="🎮 Get current free games from Epic or Steam.", inline=False)
-        embed.add_field(name="`g!track <game>`", value="🔔 Track a game for price drops.", inline=False)
-        embed.add_field(name="`g!ping`", value="Bot latency check.", inline=False)
-        embed.add_field(name="`g!credit`", value="Bot creator info.", inline=False)
-        embed.set_footer(text="GameClaim • Free Game Tracker")
-        return embed
+        pages = self._get_help_pages(interaction.user)
+        view = HelpDropdownView(pages, interaction.user)
+        await interaction.response.send_message(embed=pages["overview"], view=view, ephemeral=True)
+        view.message = await interaction.original_response()
 
 
 
